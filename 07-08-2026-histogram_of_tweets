@@ -39,3 +39,8 @@ FROM (
 ) t
 GROUP BY cnt
 ORDER BY cnt;
+
+
+-> WHERE EXTRACT(YEAR FROM tweet_date) = '2022' is also possible'
+-> ORDER BY 1 instead of ORDER BY cnt, 1 is cnt AS tweet_bucket and 2 is COUNT(*) AS users_num. Anyways by fault without ORDER BY cnt in this case is also fine
+-> t is just how we named the inner table
