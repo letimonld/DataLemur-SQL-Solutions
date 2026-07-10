@@ -41,3 +41,15 @@ FROM posts
 WHERE DATE_PART('year', post_date::DATE) = 2021 
 GROUP BY user_id
 HAVING COUNT(post_id)>1;
+
+or if they ask months apart:
+SELECT 
+    user_id,
+    (EXTRACT(YEAR FROM MAX(post_date)) - EXTRACT(YEAR FROM MIN(post_date))) * 12 +
+    (EXTRACT(MONTH FROM MAX(post_date)) - EXTRACT(MONTH FROM MIN(post_date))) AS months_between
+FROM posts
+WHERE DATE_PART('year', post_date) = 2021
+GROUP BY user_id
+HAVING COUNT(post_id) > 1;
+
+
