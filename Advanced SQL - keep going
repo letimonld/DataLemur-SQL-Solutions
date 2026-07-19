@@ -1,0 +1,495 @@
+# Advanced SQL for Data Engineers (NL Job Market Focus)
+
+## 0. Context: what "advanced SQL" means for a DE role in the Netherlands
+
+Dutch data engineering job postings (ING, ASML, Booking.com, Ahold Delhaize, Picnic, Adyen, bol.com, government/gemeente roles, consultancies like Deloitte/Xebia) usually assume you're comfortable with:
+
+- **Warehouses/engines**: PostgreSQL, Snowflake, BigQuery, Databricks (Spark SQL), Azure Synapse/Fabric, sometimes Teradata (banks/insurers)
+- **Modeling layer**: dbt (SQL-first transformation, tests, docs) — extremely common in NL
+- **Orchestration context**: Airflow / Dagster calling SQL models
+- **GDPR-adjacent skills**: masking, row-level security, data classification in SQL
+
+This guide uses ANSI/PostgreSQL syntax by default and calls out BigQuery/Snowflake/Spark differences where they matter.
+
+---
+
+## 1. Advanced Joins
+
+### 1.1 Self join
+```sql
+-- Find employees earning more than their manager
+SELECT e.name AS employee, m.name AS manager, e.salary, m.salary AS manager_salary
+FROM employees e
+JOIN employees m ON e.manager_id = m.id
+WHERE e.salary > m.salary;
+```
+
+### 1.2 Semi join (EXISTS) vs Anti join (NOT EXISTS)
+```sql
+-- Semi join: customers who HAVE placed an order (don't need order columns)
+SELECT c.*
+FROM customers c
+WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id);
+
+-- Anti join: customers who have NEVER ordered
+SELECT c.*
+FROM customers c
+WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id);
+```
+`NOT EXISTS` is generally safer than `NOT IN` because `NOT IN` breaks silently if the subquery returns a NULL.
+
+### 1.3 LATERAL join (correlated join per row — top-N per group)
+```sql
+-- Top 3 most recent orders per customer
+SELECT c.id, o.*
+FROM customers c
+CROSS JOIN LATERAL (
+    SELECT o2.*
+    FROM orders o2
+    WHERE o2.customer_id = c.id
+    ORDER BY o2.order_date DESC
+    LIMIT 3
+) o;
+```
+BigQuery equivalent concept: correlated subqueries or `ARRAY_AGG` with `ORDER BY ... LIMIT`.
+
+### 1.4 Non-equi / range joins
+```sql
+-- Assign each transaction to a price tier based on a range table
+SELECT t.id, t.amount, tier.tier_name
+FROM transactions t
+JOIN price_tiers tier
+  ON t.amount BETWEEN tier.min_amount AND tier.max_amount;
+```
+
+---
+
+## 2. Window Functions (the single most-tested "advanced SQL" topic)
+
+### 2.1 Ranking functions
+```sql
+SELECT
+    employee_id,
+    department,
+    salary,
+    ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn,
+    RANK()       OVER (PARTITION BY department ORDER BY salary DESC) AS rnk,
+    DENSE_RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS dense_rnk,
+    NTILE(4)     OVER (PARTITION BY department ORDER BY salary DESC) AS quartile
+FROM employees;
+```
+- `ROW_NUMBER`: always unique, no ties
+- `RANK`: ties share rank, gaps appear after (1,1,3)
+- `DENSE_RANK`: ties share rank, no gaps (1,1,2)
+
+### 2.2 Deduplication pattern (very common interview question)
+```sql
+-- Keep only the latest record per key (e.g. latest snapshot of a customer)
+WITH ranked AS (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY updated_at DESC) AS rn
+    FROM customer_snapshots
+)
+SELECT * FROM ranked WHERE rn = 1;
+```
+
+### 2.3 Aggregate window functions (running totals, moving averages)
+```sql
+SELECT
+    order_date,
+    daily_revenue,
+    SUM(daily_revenue) OVER (ORDER BY order_date) AS running_total,
+    AVG(daily_revenue) OVER (
+        ORDER BY order_date
+        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS moving_avg_7d
+FROM daily_sales;
+```
+
+### 2.4 Offset functions: LAG / LEAD
+```sql
+-- Month-over-month growth
+SELECT
+    month,
+    revenue,
+    LAG(revenue) OVER (ORDER BY month) AS prev_month_revenue,
+    revenue - LAG(revenue) OVER (ORDER BY month) AS mom_change,
+    ROUND(
+      100.0 * (revenue - LAG(revenue) OVER (ORDER BY month))
+      / NULLIF(LAG(revenue) OVER (ORDER BY month), 0), 2
+    ) AS mom_pct_change
+FROM monthly_revenue;
+```
+
+### 2.5 FIRST_VALUE / LAST_VALUE
+```sql
+SELECT
+    customer_id,
+    order_date,
+    amount,
+    FIRST_VALUE(amount) OVER (
+        PARTITION BY customer_id ORDER BY order_date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+    ) AS first_order_amount
+FROM orders;
+```
+Gotcha: `LAST_VALUE` needs an explicit frame (`ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`), otherwise the default frame (`... AND CURRENT ROW`) gives you the current row, not the true last row.
+
+### 2.6 Frame clauses cheat sheet
+```
+ROWS BETWEEN 3 PRECEDING AND CURRENT ROW   -- physical rows
+RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW  -- logical value-based range
+```
+`ROWS` = physical row count; `RANGE` = based on the value in ORDER BY (useful for date-based windows with gaps).
+
+---
+
+## 3. CTEs (Common Table Expressions)
+
+### 3.1 Basic / stacking CTEs for readable pipelines
+```sql
+WITH cleaned AS (
+    SELECT * FROM raw_orders WHERE amount > 0
+),
+enriched AS (
+    SELECT c.*, cust.country
+    FROM cleaned c
+    JOIN customers cust ON cust.id = c.customer_id
+)
+SELECT country, SUM(amount) AS total
+FROM enriched
+GROUP BY country;
+```
+
+### 3.2 Recursive CTE (org charts, bill-of-materials, date spines)
+```sql
+-- Org chart: all reports under a given manager
+WITH RECURSIVE org_chart AS (
+    SELECT id, name, manager_id, 1 AS level
+    FROM employees
+    WHERE id = 1  -- the root/CEO
+
+    UNION ALL
+
+    SELECT e.id, e.name, e.manager_id, oc.level + 1
+    FROM employees e
+    JOIN org_chart oc ON e.manager_id = oc.id
+)
+SELECT * FROM org_chart ORDER BY level;
+```
+
+```sql
+-- Generate a date spine (extremely common DE utility pattern)
+WITH RECURSIVE dates AS (
+    SELECT DATE '2026-01-01' AS d
+    UNION ALL
+    SELECT d + INTERVAL '1 day' FROM dates WHERE d < DATE '2026-12-31'
+)
+SELECT d FROM dates;
+```
+BigQuery: use `GENERATE_DATE_ARRAY()` instead of a recursive CTE — much cheaper.
+
+---
+
+## 4. Set Operations
+```sql
+SELECT customer_id FROM eu_customers
+UNION          -- dedupes
+SELECT customer_id FROM uk_customers;
+
+SELECT customer_id FROM eu_customers
+UNION ALL      -- keeps duplicates, faster
+SELECT customer_id FROM uk_customers;
+
+SELECT customer_id FROM active_customers
+INTERSECT
+SELECT customer_id FROM newsletter_subscribers;
+
+SELECT customer_id FROM all_customers
+EXCEPT         -- "MINUS" in Oracle/Teradata
+SELECT customer_id FROM churned_customers;
+```
+
+---
+
+## 5. Pivoting & Unpivoting
+
+### 5.1 Pivot with conditional aggregation (portable across engines)
+```sql
+SELECT
+    product_id,
+    SUM(CASE WHEN quarter = 'Q1' THEN revenue END) AS q1,
+    SUM(CASE WHEN quarter = 'Q2' THEN revenue END) AS q2,
+    SUM(CASE WHEN quarter = 'Q3' THEN revenue END) AS q3,
+    SUM(CASE WHEN quarter = 'Q4' THEN revenue END) AS q4
+FROM sales
+GROUP BY product_id;
+```
+
+### 5.2 Unpivot
+```sql
+SELECT product_id, 'q1' AS quarter, q1 AS revenue FROM sales_wide
+UNION ALL
+SELECT product_id, 'q2', q2 FROM sales_wide
+UNION ALL
+SELECT product_id, 'q3', q3 FROM sales_wide
+UNION ALL
+SELECT product_id, 'q4', q4 FROM sales_wide;
+```
+Snowflake/BigQuery have native `PIVOT` / `UNPIVOT` syntax — worth knowing if that's your stack.
+
+---
+
+## 6. GROUP BY extensions
+```sql
+-- Subtotals + grand total in one query (great for BI-style reports)
+SELECT country, product_category, SUM(revenue)
+FROM sales
+GROUP BY ROLLUP (country, product_category);
+
+-- All combinations of subtotals
+SELECT country, product_category, SUM(revenue)
+FROM sales
+GROUP BY CUBE (country, product_category);
+
+-- Specific custom groupings
+SELECT country, product_category, SUM(revenue)
+FROM sales
+GROUP BY GROUPING SETS ((country), (product_category), ());
+```
+
+---
+
+## 7. JSON / semi-structured data (very relevant — most Dutch stacks ingest JSON events)
+
+### PostgreSQL
+```sql
+SELECT
+    payload->>'event_type' AS event_type,
+    (payload->'user'->>'id')::int AS user_id,
+    payload #>> '{metadata,source}' AS source
+FROM events;
+
+-- Expand a JSON array into rows
+SELECT event_id, item
+FROM events, jsonb_array_elements(payload->'items') AS item;
+```
+
+### BigQuery
+```sql
+SELECT
+    JSON_VALUE(payload, '$.event_type') AS event_type,
+    JSON_VALUE(payload, '$.user.id') AS user_id
+FROM events;
+```
+
+### Snowflake
+```sql
+SELECT
+    payload:event_type::string AS event_type,
+    payload:user.id::int AS user_id
+FROM events;
+```
+
+---
+
+## 8. Date/Time handling & time zones
+
+Netherlands sits in CET/CEST — DST transitions are a real, recurring bug source in pipelines.
+
+```sql
+-- Convert UTC storage time to Amsterdam local time (handles DST automatically)
+SELECT
+    event_time_utc,
+    event_time_utc AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Amsterdam' AS event_time_local
+FROM events;
+
+-- Truncate to week/month for aggregation
+SELECT DATE_TRUNC('week', order_date) AS week_start, SUM(amount)
+FROM orders
+GROUP BY 1;
+
+-- Generate a full calendar of dates and left join to find gaps (missing days)
+SELECT d.day, COALESCE(s.total, 0) AS total
+FROM generate_series(DATE '2026-01-01', DATE '2026-01-31', INTERVAL '1 day') d(day)
+LEFT JOIN daily_sales s ON s.order_date = d.day;
+```
+**Best practice**: always store timestamps in UTC, convert to `Europe/Amsterdam` only at presentation/BI layer.
+
+---
+
+## 9. Data warehousing patterns (star schema, SCD, upserts)
+
+### 9.1 Slowly Changing Dimension Type 2 (extremely common DE interview question)
+```sql
+-- Close out old version, insert new version, in one transaction
+BEGIN;
+
+UPDATE dim_customer
+SET valid_to = CURRENT_DATE, is_current = FALSE
+WHERE customer_id = 123 AND is_current = TRUE;
+
+INSERT INTO dim_customer (customer_id, name, address, valid_from, valid_to, is_current)
+VALUES (123, 'New Name', 'New Address', CURRENT_DATE, NULL, TRUE);
+
+COMMIT;
+```
+
+### 9.2 Idempotent upsert / MERGE (core of most incremental dbt models)
+```sql
+MERGE INTO target_table AS t
+USING staging_table AS s
+ON t.id = s.id
+WHEN MATCHED AND t.updated_at < s.updated_at THEN
+    UPDATE SET name = s.name, updated_at = s.updated_at
+WHEN NOT MATCHED THEN
+    INSERT (id, name, updated_at)
+    VALUES (s.id, s.name, s.updated_at);
+```
+PostgreSQL alternative (`ON CONFLICT`):
+```sql
+INSERT INTO target_table (id, name, updated_at)
+VALUES (1, 'Alice', now())
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name, updated_at = EXCLUDED.updated_at
+WHERE target_table.updated_at < EXCLUDED.updated_at;
+```
+
+### 9.3 Star schema fact query
+```sql
+SELECT
+    d.year, d.month,
+    p.category,
+    SUM(f.quantity * f.unit_price) AS revenue
+FROM fact_sales f
+JOIN dim_date d ON f.date_key = d.date_key
+JOIN dim_product p ON f.product_key = p.product_key
+GROUP BY d.year, d.month, p.category;
+```
+
+---
+
+## 10. Query performance & optimization
+
+### 10.1 Reading an execution plan
+```sql
+EXPLAIN ANALYZE
+SELECT customer_id, SUM(amount)
+FROM orders
+WHERE order_date >= '2026-01-01'
+GROUP BY customer_id;
+```
+Look for: **Seq Scan** (bad on huge tables — check for missing index), **estimated vs actual rows** (big mismatch = stale statistics), **Sort**/**Hash** spilling to disk (needs more `work_mem` or a better index).
+
+### 10.2 Indexing
+```sql
+CREATE INDEX idx_orders_customer_date ON orders (customer_id, order_date);
+
+-- Partial index: only index the rows you actually query often
+CREATE INDEX idx_orders_open ON orders (customer_id) WHERE status = 'open';
+
+-- Covering index (avoids a table lookup)
+CREATE INDEX idx_orders_covering ON orders (customer_id) INCLUDE (amount, status);
+```
+
+### 10.3 Partitioning (essential at real DE scale)
+```sql
+CREATE TABLE events (
+    id BIGINT,
+    event_time TIMESTAMP,
+    payload JSONB
+) PARTITION BY RANGE (event_time);
+
+CREATE TABLE events_2026_01 PARTITION OF events
+    FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+```
+BigQuery: `PARTITION BY DATE(event_time) CLUSTER BY customer_id` — partitioning controls scan cost directly (billed per byte scanned), clustering improves filter/sort performance.
+
+### 10.4 Common anti-patterns to avoid
+- `SELECT *` in production pipelines (breaks schema evolution, wastes I/O)
+- Functions on indexed columns in `WHERE` (`WHERE DATE(created_at) = ...` disables the index — filter on a range instead)
+- `NOT IN` with a subquery that can return NULL (use `NOT EXISTS`)
+- Uncontrolled `CROSS JOIN` / cartesian joins from a missing join condition
+- Correlated subqueries in the `SELECT` list executed per row instead of a window function or join
+
+---
+
+## 11. Transactions & isolation levels
+```sql
+BEGIN;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;
+```
+Know the ACID properties and the standard isolation levels: **Read Uncommitted, Read Committed, Repeatable Read, Serializable** — and what anomaly each one prevents (dirty read, non-repeatable read, phantom read). Most warehouses (BigQuery, Snowflake) don't expose classic row-level transactions the way OLTP databases do — worth knowing that distinction for interviews.
+
+---
+
+## 12. Stored procedures / UDFs (less central for DE, but asked about)
+```sql
+CREATE OR REPLACE FUNCTION full_name(first TEXT, last TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN first || ' ' || last;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT full_name(first_name, last_name) FROM employees;
+```
+
+---
+
+## 13. Data quality checks in SQL (the dbt-test mindset)
+```sql
+-- Uniqueness check
+SELECT id, COUNT(*)
+FROM dim_customer
+GROUP BY id
+HAVING COUNT(*) > 1;
+
+-- Referential integrity check (orphan foreign keys)
+SELECT o.id
+FROM orders o
+LEFT JOIN customers c ON o.customer_id = c.id
+WHERE c.id IS NULL;
+
+-- Freshness check
+SELECT MAX(loaded_at) AS last_load, now() - MAX(loaded_at) AS staleness
+FROM raw_events;
+
+-- Null/completeness check
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(*) FILTER (WHERE email IS NULL) AS missing_email
+FROM customers;
+```
+In practice on NL projects this logic usually lives as **dbt tests** (`unique`, `not_null`, `relationships`, `accepted_values`) rather than raw SQL — worth learning dbt alongside SQL itself.
+
+---
+
+## 14. Suggested learning path
+1. Nail joins, window functions, and CTEs cold — these come up in almost every DE technical interview in NL.
+2. Practice the dedup / running-total / SCD2 / gaps-and-islands patterns until you can write them without looking them up.
+3. Learn to read `EXPLAIN ANALYZE` on Postgres — even if your job uses Snowflake/BigQuery, the reasoning transfers.
+4. Pick one cloud warehouse (BigQuery or Snowflake are most common in NL job ads) and learn its JSON/semi-structured functions and cost model (BigQuery bills by bytes scanned — partitioning/clustering directly saves money).
+5. Learn dbt: it's the de facto standard SQL transformation tool in the Dutch data engineering market, and it wraps most of section 9 and 13 above into a workflow.
+6. Practice on real datasets: StrataScratch, LeetCode SQL, DataLemur — good for interview-style practice of exactly the patterns above.
+
+---
+
+## 15. Gaps-and-islands (bonus — shows up often, worth knowing)
+```sql
+-- Find consecutive login streaks per user
+WITH numbered AS (
+    SELECT
+        user_id,
+        login_date,
+        login_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY login_date))::int AS grp
+    FROM logins
+)
+SELECT user_id, MIN(login_date) AS streak_start, MAX(login_date) AS streak_end, COUNT(*) AS streak_length
+FROM numbered
+GROUP BY user_id, grp
+ORDER BY user_id, streak_start;
+```
+This "subtract a row number from the date" trick collapses consecutive dates into the same group — a classic advanced-SQL interview pattern.
