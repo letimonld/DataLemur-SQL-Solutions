@@ -40,8 +40,15 @@ WITH call_records AS (
     COUNT(case_id) AS call_count
   FROM callers
   GROUP BY policy_holder_id
-  HAVING COUNT(case_id) >= 3
+  HAVING COUNT(DISTINCT case_id) >= 3
 )
 
 SELECT COUNT(policy_holder_id) AS policy_holder_count
 FROM call_records;
+
+Solution 2:SELECT DISTINCT
+COUNT(c.policy_holder_id) OVER() AS member_count
+FROM callers c
+GROUP BY c.policy_holder_id
+HAVING COUNT(DISTINCT c.case_id) >=3;
+-> Solution 2 is only used for small datasets, using Window function for practice
