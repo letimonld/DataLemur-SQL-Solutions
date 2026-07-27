@@ -52,3 +52,5 @@ SELECT category_name, product_name
 FROM best_products
 WHERE product_rank = 1 
 ORDER BY category_name;
+
+->> RANK() skips rank 3 and moves straight to 4
