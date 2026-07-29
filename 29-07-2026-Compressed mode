@@ -41,3 +41,13 @@ WHERE order_occurrences = (
   FROM items_per_order
 )
 ORDER BY item_count;
+
+->>MODE() WITHIN GROUP (ORDER BY ...) is an Ordered-Set Aggregate Function (supported primarily in PostgreSQL and Oracle) used to find the most frequently occurring value (the statistical mode) in a column.
+
+->> Unlike simple aggregate functions like AVG() or SUM() that calculate a result over an unsorted group, statistical calculations like medians or modes depend on sorting the values first.
+
+->> If two or more values appear with the exact same highest frequency (e.g., both "Red" and "Blue" appear 3 times), MODE() will arbitrarily pick the first one based on the sort order defined inside WITHIN GROUP (ORDER BY ...).
+
+If you use ORDER BY color ASC, it will favor "Blue" (alphabetically first).
+
+If you use ORDER BY color DESC, it will favor "Red".
