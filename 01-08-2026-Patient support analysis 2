@@ -41,3 +41,5 @@ SELECT
   ROUND(100.0 * uncategorised_calls 
     / (SELECT COUNT(*) FROM callers), 1) AS uncategorised_call_pct
 FROM uncategorised_callers;
+
+-> call_category IS NULL OR call_category = 'n/a' catches both a true database NULL and a literal placeholder string 'n/a'
