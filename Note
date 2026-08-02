@@ -1,0 +1,8 @@
+1. CAST
+    CAST(expression AS target_data_type)
+e.g: CAST(measurement_time AS DATE) -> Change 2026-08-02 14:30:00 into 2026-08-02
+CAST('123' AS INTEGER) -> Cast '123' into 123 integer
+CAST(5 AS FLOAT) / 2 ->> Return 2.5 instead of 2
+CAST(2026 AS VARCHAR) ->> Cast 2026 into "2026"
+
+2.
