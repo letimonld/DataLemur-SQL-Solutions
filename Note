@@ -8,3 +8,8 @@ CAST(2026 AS VARCHAR) ->> Cast 2026 into "2026"
 2. Comparision between FILTER and CASE WHEN
     AGG_FUNCTION(column_name) FILTER (WHERE condition)  = AGG_FUNCTION(CASE WHEN condition THEN column_name ELSE 0 END)
 e.g: SUM(measurement_value) FILTER (WHERE measurement_num % 2 != 0) AS odd_sum = SUM(CASE WHEN measurement_num % 2 != 0 THEN measurement_value ELSE 0 END) AS odd_sum
+
+3. JOIN 
+    INNER JOIN: only the rows that have matching values in both tables, use when you care about records that exist in both places
+    LEFT JOIN: Returns all rows from the left table, plus matched rows from the right table. Unmatched rows from the right table will show as NULL
+    CROSS JOIN: Combines every row of the first table with every row of the second table (M rows x N rows).
