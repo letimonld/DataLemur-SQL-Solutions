@@ -20,3 +20,9 @@
 
     e.g: LEAD(transaction_date, 1) OVER(PARTITION BY user_id ORDER BY transaction_date) AS second_day,
         LEAD(transaction_date, 2) OVER(PARTITION BY user_id ORDER BY transaction_date) AS third_day
+
+5. MODE() WITHIN GROUP (ORDER BY target_column [ASC | DESC])
+    It counts how many times each value appears in target_column and returns the value that appears most frequently.If there is a tie , 
+    it picks the first value according to the ORDER BY direction specified.
+
+    e.g: SELECT MODE() WITHIN GROUP (ORDER BY product_category) AS most_frequent_category FROM sales;
