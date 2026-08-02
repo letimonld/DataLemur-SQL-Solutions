@@ -5,4 +5,6 @@ CAST('123' AS INTEGER) -> Cast '123' into 123 integer
 CAST(5 AS FLOAT) / 2 ->> Return 2.5 instead of 2
 CAST(2026 AS VARCHAR) ->> Cast 2026 into "2026"
 
-2.
+2. Comparision between FILTER and CASE WHEN
+    AGG_FUNCTION(column_name) FILTER (WHERE condition)  = AGG_FUNCTION(CASE WHEN condition THEN column_name ELSE 0 END)
+e.g: SUM(measurement_value) FILTER (WHERE measurement_num % 2 != 0) AS odd_sum = SUM(CASE WHEN measurement_num % 2 != 0 THEN measurement_value ELSE 0 END) AS odd_sum
