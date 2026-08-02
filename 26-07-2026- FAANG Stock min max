@@ -65,3 +65,25 @@ INNER JOIN lowest_prices AS lowest
   AND highest.row_num = 1 -- Highest open price
   AND lowest.row_num = 1 -- Lowest open price
 ORDER BY highest.ticker;
+
+
+Solution 2: Better/Shorter solution
+WITH ranked AS 
+(SELECT 
+  ticker,
+  TO_CHAR(date, 'Mon-YYYY') AS mth,
+  open,
+  ROW_NUMBER() OVER(PARTITION BY ticker ORDER BY open DESC) as highest_row,
+  ROW_NUMBER() OVER(PARTITION BY ticker ORDER BY open ASC) as lowest_row
+FROM stock_prices
+)
+
+SELECT h.ticker,
+      h.mth AS highest_mth,
+      h.open AS highest_open,
+      l.mth AS lowest_mth,
+      l.open AS lowest_open
+FROM ranked h JOIN ranked l 
+ON h.ticker = l.ticker
+WHERE h.highest_row = 1 and l.lowest_row = 1
+ORDER BY h.ticker;
