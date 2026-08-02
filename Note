@@ -26,3 +26,10 @@
     it picks the first value according to the ORDER BY direction specified.
 
     e.g: SELECT MODE() WITHIN GROUP (ORDER BY product_category) AS most_frequent_category FROM sales;
+
+6. MAKE_DATE(year(int), month (int), day(int))
+    Sometimes databases store dates as separate integer columns, MAKE_DATE converts those separate numbers into a proper calendar date
+    usually passing 1 for the day parameter to represent the first of the month
+
+    e.g: SELECT MAKE_DATE(2026, 8, 2);
+    
