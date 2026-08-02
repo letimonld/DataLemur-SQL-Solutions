@@ -35,3 +35,16 @@ INNER JOIN transactions AS T3
 ORDER BY T1.user_id;
 
 -> easyy
+
+Solution 2: WITH cte AS (SELECT user_id, transaction_date,
+  LEAD(transaction_date, 1) OVER(PARTITION BY user_id ORDER BY transaction_date) AS second_day,
+  LEAD(transaction_date, 2) OVER(PARTITION BY user_id ORDER BY transaction_date) AS third_day
+FROM transactions)
+
+SELECt user_id
+FROM cte 
+WHERE second_day = transaction_date + INTERVAL '1 DAY'
+  AND third_day = transaction_date + INTERVAL '2 DAYS';
+
+->> LEAD(): Looks FORWARD to pull values from subsequent (future) rows.
+->> LAG(): Looks BACKWARD to pull values from preceding (past) rows.
