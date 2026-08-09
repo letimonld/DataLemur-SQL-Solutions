@@ -41,3 +41,10 @@
     e.g: FLOOR(4.9) -> 4 (Always rounds down)
     e.g: CEIL(4.1) -> 5
     e.g: ROUND(4.5) -> 5
+8.GENERATE_SERIES(start, stop)
+    is a set-returning function that generates a sequence of numbers from start to stop
+    when combined with GROUP BY searches, GENERATE_SERIES(1, num_users), SQL evaluates GENERATE_SERIES for each row, 
+    duplicating the value of searches as many times as specified by num_users.
+
+9. PERCENTILE_CONT(0.50): 
+    Calculates the 50th percentile using linear interpolation between data points if there is an even number of rows.
