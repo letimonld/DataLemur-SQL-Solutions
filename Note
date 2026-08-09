@@ -32,4 +32,12 @@
     usually passing 1 for the day parameter to represent the first of the month
 
     e.g: SELECT MAKE_DATE(2026, 8, 2);
-    
+
+7. FLOOR(), CEIL(4.1), ROUND()
+    FLOOR() is a function rounds a numeric value down to the nearest integer less than or equal to that value.
+    CEIL() Always rounds up
+    ROUND() Rounds mathematically)
+
+    e.g: FLOOR(4.9) -> 4 (Always rounds down)
+    e.g: CEIL(4.1) -> 5
+    e.g: ROUND(4.5) -> 5
