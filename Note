@@ -54,5 +54,12 @@
 10. COALESCE()
     If a record in one table does not have a matching record in the other, NULL values are automatically filled in for the missing side.
 
+11. DATE_TRUNC('year', filing_date) and EXTRACT(YEAR FROM filing_date)
+    DATE_TRUNC: truncates (cuts off) a timestamp down to a specified unit of precision
+    EXTRACT: extract only year
+
+    e.g. DATE_TRUNC('year', '2026-08-10') -> 2026-01-01 00:00:00
+    e.g. EXTRACT(YEAR FROM filing_date):  -> 2026
+ 
 
 Hard questions: Maximize Prime Item Inventory / Median Google Search Frequency / Advertiser Status
