@@ -60,6 +60,14 @@
 
     e.g. DATE_TRUNC('year', '2026-08-10') -> 2026-01-01 00:00:00
     e.g. EXTRACT(YEAR FROM filing_date):  -> 2026
- 
+
+12. LIKE and ILIKE
+    LIKE: a pattern-matching operator used in the WHERE clause to search for a specified pattern in a column (usually text/varchar).
+    ILIKE:  for case-insensitive matching without needing the LOWER() function
+    % (Percent sign): Represents zero, one, or multiple characters and 
+    _ (Underscore): Represents a single character.
+
+    e.g. WHERE product LIKE 'Turbo%' -> 'TurboTax', 'TurboTax Deluxe', 'Turbo'
+    e.g. WHERE product LIKE 'T_rbo' -> 'Turbo', 'Tarbo'
 
 Hard questions: Maximize Prime Item Inventory / Median Google Search Frequency / Advertiser Status
