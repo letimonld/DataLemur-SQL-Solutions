@@ -82,6 +82,10 @@
         -> ('Bacon', 'Chicken') -> 'Bacon' comes before 'Chicken' alphabetically -> KEPT
         -> 'Chicken', 'Bacon') -> 'Chicken' does NOT come before 'Bacon' -> DISCARDED
         -> ('Bacon', 'Bacon') -> 'Bacon' is NOT less than 'Bacon' -> DISCARDED
+14. EPOCH(): convert it into the total number of elapsed seconds
+    TO_TIMESTAMP(): convert them back into a human-readable TIMESTAMP format using dialect-specific functions
 
+    e.g. SELECT EXTRACT(EPOCH FROM TIMESTAMP '2026-08-10 12:00:00'); -> Output: 1786363200
+    e.g. SELECT TO_TIMESTAMP(1786363200); -> Output: 2026-08-10 12:00:00+00
 
 Hard questions: Maximize Prime Item Inventory / Median Google Search Frequency / Advertiser Status
