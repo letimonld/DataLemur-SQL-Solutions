@@ -53,3 +53,6 @@
 
 10. COALESCE()
     If a record in one table does not have a matching record in the other, NULL values are automatically filled in for the missing side.
+
+
+Hard questions: Maximize Prime Item Inventory / Median Google Search Frequency / Advertiser Status
