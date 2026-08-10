@@ -13,6 +13,8 @@
     INNER JOIN: only the rows that have matching values in both tables, use when you care about records that exist in both places
     LEFT JOIN: Returns all rows from the left table, plus matched rows from the right table. Unmatched rows from the right table will show as NULL
     CROSS JOIN: Combines every row of the first table with every row of the second table (M rows x N rows).
+    FULL OUTER JOIN/ FULL JOIN: combines records from both tables and keeps all rows from both sides, If a record in one table does not have a 
+    matching record in the other,NULL values are automatically filled in for the missing side.
 
 4. LEAD() and LAG(): Both LEAD() and LAG() are positional window functions used to access data from other rows in a result set without performing a self-join.
     LEAD(): Looks FORWARD to pull values from subsequent (future) rows.
@@ -48,3 +50,6 @@
 
 9. PERCENTILE_CONT(0.50): 
     Calculates the 50th percentile using linear interpolation between data points if there is an even number of rows.
+
+10. COALESCE()
+    If a record in one table does not have a matching record in the other, NULL values are automatically filled in for the missing side.
