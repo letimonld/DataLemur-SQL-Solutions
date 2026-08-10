@@ -69,5 +69,19 @@
 
     e.g. WHERE product LIKE 'Turbo%' -> 'TurboTax', 'TurboTax Deluxe', 'Turbo'
     e.g. WHERE product LIKE 'T_rbo' -> 'Turbo', 'Tarbo'
+13. CONCAT(p1.topping_name, ',', p2.topping_name, ',', p3.topping_name)
+    Using'<' operator shines in SQL interview problems (like pairing products or pizza toppings) when you need to combine items from 
+    the same table without creating duplicate permutations.
+
+    e.g. SELECT 
+          p1.topping_name AS topping_1,
+          p2.topping_name AS topping_2
+        FROM pizza_toppings AS p1
+        INNER JOIN pizza_toppings AS p2
+          ON p1.topping_name < p2.topping_name;
+        -> ('Bacon', 'Chicken') -> 'Bacon' comes before 'Chicken' alphabetically -> KEPT
+        -> 'Chicken', 'Bacon') -> 'Chicken' does NOT come before 'Bacon' -> DISCARDED
+        -> ('Bacon', 'Bacon') -> 'Bacon' is NOT less than 'Bacon' -> DISCARDED
+
 
 Hard questions: Maximize Prime Item Inventory / Median Google Search Frequency / Advertiser Status
